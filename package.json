@@ -1,0 +1,16 @@
+{
+  "name": "aimixer-api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "aimixer-api.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Michael Wood",
+  "license": "SEE LICENSE IN license.md",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "https": "^1.0.0"
+  }
+}
