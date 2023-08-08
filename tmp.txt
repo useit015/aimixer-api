@@ -1,0 +1,7 @@
+SELECT email, info, verified
+INTO OUTFILE 'fraudsters-delta.csv'
+FIELDS TERMINATED BY ','
+ENCLOSED BY '"'
+LINES TERMINATED BY '\n'
+FROM pymnts_device_authentication
+WHERE info LIKE '%fraudsters-target%';
