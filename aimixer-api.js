@@ -248,13 +248,13 @@ const handleChangeBowlSource = async (data, socket) => {
 
 }
 
-const addContentToBowl = async (data, socket) => {
+const handleAddContentToBowl = async (data, socket) => {
   const { token, bowlId, content } = data;
   const info = auth.validateToken(token);
   if (info === false) return socket.emit('alert', 'Login expired.');
   const { accountId, email, username, domain } = info;
 
-  let q = `SELECT meta FROM bowls WHERE id = ${mysql.escape(id)}`;
+  let q = `SELECT meta FROM bowls WHERE id = ${mysql.escape(bowlId)}`;
 
   let r = await query(q);
 
@@ -262,16 +262,15 @@ const addContentToBowl = async (data, socket) => {
 
   let meta = JSON.parse(r[0].meta);
 
-  meta.content.push(content);
+  meta.contents.push(content);
 
-  q = `UPDATE bowls SET meta = ${mysql.escape(JSON.stringify(meta))} WHERE id = ${mysql.escape(id)}`;
+  q = `UPDATE bowls SET meta = ${mysql.escape(JSON.stringify(meta))} WHERE id = ${mysql.escape(bowlId)}`;
 
   r = await query(q);
 
   if (r === false) return socket.emit('alert', 'Could not add content to bowl');
 
   return socket.emit('addContentToBowl', {bowlId, content});
-
 }
 
 
