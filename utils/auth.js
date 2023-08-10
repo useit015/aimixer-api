@@ -1,3 +1,8 @@
+require('dotenv').config();
+
+const jwt = require('jsonwebtoken');
+const { JWT_PASSWORD } = process.env;
+
 exports.validateToken = token => {
   
     let test;

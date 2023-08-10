@@ -10,7 +10,6 @@ const cors = require('cors');
 const fs = require('fs');
 const socketio = require('socket.io');
 const { v4: uuidv4 } = require('uuid');
-const jwt = require('jsonwebtoken');
 const mysql = require('mysql2');
 
 const auth = require('./utils/auth');
@@ -249,6 +248,33 @@ const handleChangeBowlSource = async (data, socket) => {
 
 }
 
+const addContentToBowl = async (data, socket) => {
+  const { token, bowlId, content } = data;
+  const info = auth.validateToken(token);
+  if (info === false) return socket.emit('alert', 'Login expired.');
+  const { accountId, email, username, domain } = info;
+
+  let q = `SELECT meta FROM bowls WHERE id = ${mysql.escape(id)}`;
+
+  let r = await query(q);
+
+  if (r === false) return socket.emit('alert', 'Could not add content to bowl');
+
+  let meta = JSON.parse(r[0].meta);
+
+  meta.content.push(content);
+
+  q = `UPDATE bowls SET meta = ${mysql.escape(JSON.stringify(meta))} WHERE id = ${mysql.escape(id)}`;
+
+  r = await query(q);
+
+  if (r === false) return socket.emit('alert', 'Could not add content to bowl');
+
+  return socket.emit('addContentToBowl', {bowlId, content});
+
+}
+
+
 io.on("connection", (socket) => {
   console.log('connected', socket.id)
  
@@ -265,7 +291,7 @@ io.on("connection", (socket) => {
   socket.on('changeBowlOutput', data => handleChangeBowlOutput(data, socket));
   socket.on('changeBowlLength', data => handleChangeBowlLength(data, socket));
   socket.on('changeBowlSource', data => handleChangeBowlSource(data, socket));
-
+  socket.on('addContentToBowl', data => handleAddContentToBowl(data, socket));
 
   // socket.emit('message', 'Login Successful');
   // socket.emit('alert', 'Ooops');
