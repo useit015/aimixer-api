@@ -102,7 +102,8 @@ const handleGetBowls = async (token, socket) => {
       accountId,
       output: meta.output,
       length: meta.length,
-      source: meta.source
+      source: meta.source,
+      contents: meta.contents
     }
   })
 
@@ -120,7 +121,8 @@ const handleAddBowl = async (data, socket) => {
     output: 'newsArticle',
     length: 'longForm',
     source: 'googleSearch',
-    contents: []
+    contents: [],
+    articles: []
   }
 
   let q = `INSERT INTO bowls (id, account_id, name, creator, domain, meta) VALUES ('${id}', '${accountId}', ${mysql.escape(name)}, '${email}', '${domain}', '${JSON.stringify(meta)}')`;
@@ -128,7 +130,7 @@ const handleAddBowl = async (data, socket) => {
   if (r === false) return socket.emit('alert', 'Could not add bowl');
 
   socket.emit('addBowl', {
-    id, name, creator: email, domain, accountId, output: meta.output, length: meta.length, source: meta.source, contents: []
+    id, name, creator: email, domain, accountId, output: meta.output, length: meta.length, source: meta.source, contents: [], articles: []
   })
 
 }
@@ -273,6 +275,36 @@ const handleAddContentToBowl = async (data, socket) => {
   return socket.emit('addContentToBowl', {bowlId, content});
 }
 
+const handleChangeContentDate = async (data, socket) => {
+  const { token, bowlId, contentId, date } = data;
+  const info = auth.validateToken(token);
+  if (info === false) return socket.emit('alert', 'Login expired.');
+  const { accountId, email, username, domain } = info;
+
+  let q = `SELECT meta FROM bowls WHERE id = ${mysql.escape(bowlId)}`;
+
+  let r = await query(q);
+
+  if (r === false) return socket.emit('alert', 'Could not change content date');
+
+  let meta = JSON.parse(r[0].meta);
+
+  let test = meta.contents.find(c => c.id === contentId);
+
+  if (!test) return socket.emit('alert', 'Could not change content date');
+
+  test.date = date;
+
+  q = `UPDATE bowls SET meta = ${mysql.escape(JSON.stringify(meta))} WHERE id = ${mysql.escape(bowlId)}`;
+
+  r = await query(q);
+
+  if (r === false) return socket.emit('alert', 'Could not add content to bowl');
+
+  return socket.emit('changeContentDate', {bowlId, contentId, date});
+}
+
+
 
 io.on("connection", (socket) => {
   console.log('connected', socket.id)
@@ -291,6 +323,7 @@ io.on("connection", (socket) => {
   socket.on('changeBowlLength', data => handleChangeBowlLength(data, socket));
   socket.on('changeBowlSource', data => handleChangeBowlSource(data, socket));
   socket.on('addContentToBowl', data => handleAddContentToBowl(data, socket));
+  socket.on('changeContentDate', data => handleChangeContentDate(data, socket));
 
   // socket.emit('message', 'Login Successful');
   // socket.emit('alert', 'Ooops');
