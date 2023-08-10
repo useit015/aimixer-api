@@ -13,6 +13,8 @@ const { v4: uuidv4 } = require('uuid');
 const jwt = require('jsonwebtoken');
 const mysql = require('mysql2');
 
+const auth = require('./utils/auth');
+
 const { MYSQL_HOST, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE, JWT_PASSWORD } = process.env;
 
 const mysqlOptions = {
@@ -68,21 +70,9 @@ const io = socketio(httpsServer, {
   }
 });
 
-const validateToken = token => {
-  
-  let test;
-
-  try {
-     test = jwt.verify(token, JWT_PASSWORD)
-    // TODO: check expiration
-  } catch(err) {
-    return false;
-  }
-  return test;
-}
 
 const handleGetBowls = async (token, socket) => {
-  const info = validateToken(token);
+  const info = auth.validateToken(token);
   if (info === false) return socket.emit('alert', 'Login expired.');
   const { accountId, email, username, domain } = info;
 
@@ -123,14 +113,15 @@ const handleGetBowls = async (token, socket) => {
 
 const handleAddBowl = async (data, socket) => {
   const { name, token } = data;
-  const info = validateToken(token);
+  const info = auth.validateToken(token);
   if (info === false) return socket.emit('alert', 'Login expired.');
   const { accountId, email, username, domain } = info;
   const id = uuidv4();
   const meta = {
-    output: 'out00',
-    length: 'len02',
-    source: 'src00'
+    output: 'newsArticle',
+    length: 'longForm',
+    source: 'googleSearch',
+    contents: []
   }
 
   let q = `INSERT INTO bowls (id, account_id, name, creator, domain, meta) VALUES ('${id}', '${accountId}', ${mysql.escape(name)}, '${email}', '${domain}', '${JSON.stringify(meta)}')`;
@@ -138,7 +129,7 @@ const handleAddBowl = async (data, socket) => {
   if (r === false) return socket.emit('alert', 'Could not add bowl');
 
   socket.emit('addBowl', {
-    id, name, creator: email, domain, accountId
+    id, name, creator: email, domain, accountId, output: meta.output, length: meta.length, source: meta.source, contents: []
   })
 
 }
@@ -146,7 +137,7 @@ const handleAddBowl = async (data, socket) => {
 const handleDeleteBowl = async (data, socket) => {
   const { id, token } = data;
   console.log(id, token);
-  const info = validateToken(token);
+  const info = auth.validateToken(token);
   if (info === false) return socket.emit('alert', 'Login expired.');
   const { accountId, email, username, domain } = info;
 
@@ -165,7 +156,7 @@ const handleDeleteBowl = async (data, socket) => {
 const handleUpdateBowlName = async (data, socket) => {
   const { id, name, token } = data;
   console.log(id, token);
-  const info = validateToken(token);
+  const info = auth.validateToken(token);
   if (info === false) return socket.emit('alert', 'Login expired.');
   const { accountId, email, username, domain } = info;
 
@@ -177,6 +168,86 @@ const handleUpdateBowlName = async (data, socket) => {
 
 }
 
+const handleChangeBowlOutput = async (data, socket) => {
+  const { id, output, token } = data;
+  console.log(id, token);
+  const info = auth.validateToken(token);
+  if (info === false) return socket.emit('alert', 'Login expired.');
+  const { accountId, email, username, domain } = info;
+
+  let q = `SELECT meta FROM bowls WHERE id = ${mysql.escape(id)}`;
+
+  let r = await query(q);
+
+  if (r === false) return socket.emit('alert', 'Could not change bowl output');
+
+  let meta = JSON.parse(r[0].meta);
+
+  meta.output = output;
+
+  q = `UPDATE bowls SET meta = ${mysql.escape(JSON.stringify(meta))} WHERE id = ${mysql.escape(id)}`;
+
+  r = await query(q);
+
+  if (r === false) return socket.emit('alert', 'Could not change bowl output');
+
+  return socket.emit('changeBowlOutput', {id, output});
+
+}
+
+const handleChangeBowlLength = async (data, socket) => {
+  const { id, length, token } = data;
+  console.log(id, token);
+  const info = auth.validateToken(token);
+  if (info === false) return socket.emit('alert', 'Login expired.');
+  const { accountId, email, username, domain } = info;
+
+  let q = `SELECT meta FROM bowls WHERE id = ${mysql.escape(id)}`;
+
+  let r = await query(q);
+
+  if (r === false) return socket.emit('alert', 'Could not change bowl length');
+
+  let meta = JSON.parse(r[0].meta);
+
+  meta.length = length;
+
+  q = `UPDATE bowls SET meta = ${mysql.escape(JSON.stringify(meta))} WHERE id = ${mysql.escape(id)}`;
+
+  r = await query(q);
+
+  if (r === false) return socket.emit('alert', 'Could not change bowl length');
+
+  return socket.emit('changeBowlLength', {id, length});
+
+}
+
+const handleChangeBowlSource = async (data, socket) => {
+  const { id, source, token } = data;
+  console.log(id, token);
+  const info = auth.validateToken(token);
+  if (info === false) return socket.emit('alert', 'Login expired.');
+  const { accountId, email, username, domain } = info;
+
+  let q = `SELECT meta FROM bowls WHERE id = ${mysql.escape(id)}`;
+
+  let r = await query(q);
+
+  if (r === false) return socket.emit('alert', 'Could not change bowl source');
+
+  let meta = JSON.parse(r[0].meta);
+
+  meta.source = source;
+
+  q = `UPDATE bowls SET meta = ${mysql.escape(JSON.stringify(meta))} WHERE id = ${mysql.escape(id)}`;
+
+  r = await query(q);
+
+  if (r === false) return socket.emit('alert', 'Could not change bowl source');
+
+  return socket.emit('changeBowlSource', {id, source});
+
+}
 
 io.on("connection", (socket) => {
   console.log('connected', socket.id)
@@ -191,6 +262,10 @@ io.on("connection", (socket) => {
   socket.on('addBowl', data => handleAddBowl(data, socket));
   socket.on('deleteBowl', data => handleDeleteBowl(data, socket));
   socket.on('updateBowlName', data => handleUpdateBowlName(data, socket));
+  socket.on('changeBowlOutput', data => handleChangeBowlOutput(data, socket));
+  socket.on('changeBowlLength', data => handleChangeBowlLength(data, socket));
+  socket.on('changeBowlSource', data => handleChangeBowlSource(data, socket));
+
 
   // socket.emit('message', 'Login Successful');
   // socket.emit('alert', 'Ooops');
