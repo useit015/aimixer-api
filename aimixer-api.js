@@ -13,6 +13,7 @@ const { v4: uuidv4 } = require('uuid');
 const mysql = require('mysql2');
 const axios = require('axios');
 
+const s3 = require('./utils/s3')
 const ai = require('./utils/ai')
 const auth = require('./utils/auth');
 
@@ -124,7 +125,7 @@ const handleAddBowl = async (data, socket) => {
     length: 'longForm',
     source: 'googleSearch',
     contents: [],
-    articles: []
+    creations: []
   }
 
   let q = `INSERT INTO bowls (id, account_id, name, creator, domain, meta) VALUES ('${id}', '${accountId}', ${mysql.escape(name)}, '${email}', '${domain}', '${JSON.stringify(meta)}')`;
@@ -132,8 +133,26 @@ const handleAddBowl = async (data, socket) => {
   if (r === false) return socket.emit('alert', 'Could not add bowl');
 
   socket.emit('addBowl', {
-    id, name, creator: email, domain, accountId, output: meta.output, length: meta.length, source: meta.source, contents: [], articles: []
+    id, name, creator: email, domain, accountId, output: meta.output, length: meta.length, source: meta.source, contents: [], creations: []
   })
+
+}
+
+const addCreation = async (creation, bowlId, socket) => {
+  let q = `SELECT meta FROM bowls WHERE id = '${bowlId}'`;
+  let r = await query(q);
+
+  if (!r.length) return false;
+
+  const meta = JSON.parse(r[0].meta);
+
+  meta.creations.push(creation);
+
+  q = `UPDATE bowls SET meta = ${mysql.escape(JSON.stringify(meta))} WHERE id = '${bowlId}'`;
+
+  r = await query(q);
+
+  if (r !== false) socket.emit('addCreation', {bowlId, creation});
 
 }
 
@@ -322,17 +341,21 @@ const getTitlesAndText = async (content) => {
   }
 }
 
-const getNewsArticle = async (results, length) => {
+const getNewsArticle = async (results, length, s3Folder) => {
   let prompt = results.length === 1 ? `"""Below is a Document. ` : `Below are Documents. `;
   prompt += `In ${length}, write a news article in a journalistic tone using information from `;
   prompt += results.length === 1 ? `the document.\n\n` : `the documents.\n\n`;
   for (let i = 0; i < results.length; ++i) {
     prompt += i < results.length - 1 ? `Document "${results[i].title}":\n${results[i].text}\n\n"` : `Document "${results[i].title}":\n${results[i].text}"""\n`;
   }
-  const newsArticle = await ai.getChatText(prompt);
-
-  console.log('newsArticle', newsArticle);
-  return newsArticle;
+  try {
+    let newsArticle = await ai.getChatText(prompt);
+    newsArticle = convertTextToHTML(newsArticle);
+    const link = s3.uploadHTML(newsArticle, s3Folder, `creation--${uuidv4()}.html`);
+    return link;
+  } catch (err) {
+    return false;
+  }
 }
 
 const getBlogPost = async (results, length) => {
@@ -362,6 +385,7 @@ const handleMix = async ({login, bowls, mix, bowlId}, socket) => {
     if (info === false) return socket.emit('alert', 'Login expired.');
     const { accountId, email, username, domain } = info;
     console.log('handleMix', info);
+    const s3Folder = `${accountId}/${bowlId}`
 
     const currentBowl = bowls.find(b => b.id === bowlId);
     if (!currentBowl) return socket.emit('alert', 'Could not find bowl to mix');
@@ -387,8 +411,8 @@ const handleMix = async ({login, bowls, mix, bowlId}, socket) => {
     let creation;
     switch(currentBowl.output) {
       case 'newsArticle':
-        creation = await getNewsArticle(results, outputLength);
-        creation = convertTextToHTML(creation);
+        creation = await getNewsArticle(results, outputLength, s3Folder);
+        
         break;
       case 'blogPost':
         creation = await getBlogPost(results, outputLength);
@@ -397,14 +421,15 @@ const handleMix = async ({login, bowls, mix, bowlId}, socket) => {
         return socket.emit('alert', `Unknown output type: ${currentBowl.output}`)
     }
 
-    // store the creation in an S3 bucket
+    if (creation === false) return socket.emit('alert', "Could not mix contents into the desired creation");
 
-    // update the database with the new article link
+    const result = await addCreation(creation, bowlId, socket);
 
-    // send back the link to the article with bowlId
+    console.log('creation', creation);
 
   } catch (err) {
-    socket.email('alert', "Could not mix contents");
+    console.error(err);
+    socket.emit('alert', "Could not mix contents");
   }
 
 
