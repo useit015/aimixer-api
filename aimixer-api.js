@@ -335,6 +335,26 @@ const getNewsArticle = async (results, length) => {
   return newsArticle;
 }
 
+const getBlogPost = async (results, length) => {
+  let prompt = results.length === 1 ? `"""Below is a Document. ` : `Below are Documents. `;
+  prompt += `In ${length}, write an HTML blog post using information from `;
+  prompt += results.length === 1 ? `the document. ` : `the documents. `;
+  prompt += `Use headings, subheadings, tables, bullets, and bold to organize the information.\n\n`
+  for (let i = 0; i < results.length; ++i) {
+    prompt += i < results.length - 1 ? `Document "${results[i].title}":\n${results[i].text}\n\n"` : `Document "${results[i].title}":\n${results[i].text}"""\n`;
+  }
+  const newsArticle = await ai.getChatText(prompt);
+
+  console.log('newsArticle', newsArticle);
+  return newsArticle;
+}
+
+const convertTextToHTML = text => {
+  const paragraphs = text.split("\n");
+  for (let i = 0; i < paragraphs.length; ++i) paragraphs[i] = `<p>${paragraphs[i]}</p>`;
+  return paragraphs.join("\n");
+}
+
 const handleMix = async ({login, bowls, mix, bowlId}, socket) => {
   try {
     const { token } = login;
@@ -352,6 +372,7 @@ const handleMix = async ({login, bowls, mix, bowlId}, socket) => {
     for (let i = 0; i < contents.length; ++i) promises.push(getTitlesAndText(contents[i]));
     let results = await Promise.all(promises);
 
+    // Convert desired length to English
     let outputLength;
     switch (currentBowl.length) {
       case 'longForm':
@@ -362,16 +383,25 @@ const handleMix = async ({login, bowls, mix, bowlId}, socket) => {
         return socket.emit('alert', `Unknown content length: ${currentBowl.length}`);
     }
 
+    // Use AI to generate desired creation
+    let creation;
     switch(currentBowl.output) {
       case 'newsArticle':
-        const newsArticle = await getNewsArticle(results, outputLength);
+        creation = await getNewsArticle(results, outputLength);
+        creation = convertTextToHTML(creation);
         break;
-
-
+      case 'blogPost':
+        creation = await getBlogPost(results, outputLength);
+        break;
       default:
         return socket.emit('alert', `Unknown output type: ${currentBowl.output}`)
     }
 
+    // store the creation in an S3 bucket
+
+    // update the database with the new article link
+
+    // send back the link to the article with bowlId
 
   } catch (err) {
     socket.email('alert', "Could not mix contents");
