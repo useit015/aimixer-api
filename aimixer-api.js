@@ -11,7 +11,9 @@ const fs = require('fs');
 const socketio = require('socket.io');
 const { v4: uuidv4 } = require('uuid');
 const mysql = require('mysql2');
+const axios = require('axios');
 
+const ai = require('./utils/ai')
 const auth = require('./utils/auth');
 
 const { MYSQL_HOST, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE, JWT_PASSWORD } = process.env;
@@ -304,14 +306,73 @@ const handleChangeContentDate = async (data, socket) => {
   return socket.emit('changeContentDate', {bowlId, contentId, date});
 }
 
-const handleMix = async ({login, bowls, fill, mix}, socket) => {
+const getTitlesAndText = async (content) => {
+  let url;
+  if (typeof content.infoLink !== 'undefined') url = content.infoLink;
+  else url = content.link;
+  const { title } = content;
+  try {
+    const response = await axios.get(url);
+    return {title, text: response.data}
+  } catch(err) {
+    console.error(err);
+    return {
+      title, text: ''
+    }
+  }
+}
+
+const getNewsArticle = async (results, length) => {
+  let prompt = results.length === 1 ? `"""Below is a Document. ` : `Below are Documents. `;
+  prompt += `In ${length}, write a news article in a journalistic tone using information from `;
+  prompt += results.length === 1 ? `the document.\n\n` : `the documents.\n\n`;
+  for (let i = 0; i < results.length; ++i) {
+    prompt += i < results.length - 1 ? `Document "${results[i].title}":\n${results[i].text}\n\n"` : `Document "${results[i].title}":\n${results[i].text}"""\n`;
+  }
+  const newsArticle = ai.getChatText(prompt);
+
+  console.log('newsArticle', newsArticle);
+  return newsArticle;
+}
+
+const handleMix = async ({login, bowls, mix, bowlId}, socket) => {
   try {
     const { token } = login;
     const info = auth.validateToken(token);
     if (info === false) return socket.emit('alert', 'Login expired.');
     const { accountId, email, username, domain } = info;
     console.log('handleMix', info);
-    
+
+    const currentBowl = bowls.find(b => b.id === bowlId);
+    if (!currentBowl) return socket.emit('alert', 'Could not find bowl to mix');
+    const { contents } = currentBowl;
+
+    // Get titles and text
+    let promises = [];
+    for (let i = 0; i < contents.length; ++i) promises.push(getTitlesAndText(contents[i]));
+    let results = await Promise.all(promises);
+
+    let outputLength;
+    switch (currentBowl.length) {
+      case 'longForm':
+        outputLength = "1200 words";
+        break;
+
+      default:
+        return socket.emit('alert', `Unknown content length: ${currentBowl.length}`);
+    }
+
+    switch(currentBowl.output) {
+      case 'newsArticle':
+        const newsArticle = await getNewsArticle(results, outputLength);
+        break;
+
+
+      default:
+        return socket.emit('alert', `Unknown output type: ${currentBowl.output}`)
+    }
+
+
   } catch (err) {
     socket.email('alert', "Could not mix contents");
   }
