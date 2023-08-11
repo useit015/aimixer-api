@@ -106,7 +106,9 @@ const handleGetBowls = async (token, socket) => {
       output: meta.output,
       length: meta.length,
       source: meta.source,
-      contents: meta.contents
+      contents: meta.contents,
+      creations: meta.creations,
+      customInstructions: meta.customInstructions
     }
   })
 
@@ -122,10 +124,11 @@ const handleAddBowl = async (data, socket) => {
   const id = uuidv4();
   const meta = {
     output: 'newsArticle',
+    customInstructions: '',
     length: 'longForm',
     source: 'googleSearch',
     contents: [],
-    creations: []
+    creations: [],
   }
 
   let q = `INSERT INTO bowls (id, account_id, name, creator, domain, meta) VALUES ('${id}', '${accountId}', ${mysql.escape(name)}, '${email}', '${domain}', '${JSON.stringify(meta)}')`;
@@ -133,7 +136,7 @@ const handleAddBowl = async (data, socket) => {
   if (r === false) return socket.emit('alert', 'Could not add bowl');
 
   socket.emit('addBowl', {
-    id, name, creator: email, domain, accountId, output: meta.output, length: meta.length, source: meta.source, contents: [], creations: []
+    id, name, creator: email, domain, accountId, output: meta.output, customInstructions: '', length: meta.length, source: meta.source, contents: [], creations: []
   })
 
 }
@@ -354,11 +357,12 @@ const getNewsArticle = async (results, length, s3Folder) => {
     const link = s3.uploadHTML(newsArticle, s3Folder, `creation--${uuidv4()}.html`);
     return link;
   } catch (err) {
+    console.error(err);
     return false;
   }
 }
 
-const getBlogPost = async (results, length) => {
+const getBlogPost = async (results, length, s3Folder) => {
   let prompt = results.length === 1 ? `"""Below is a Document. ` : `Below are Documents. `;
   prompt += `In ${length}, write an HTML blog post using information from `;
   prompt += results.length === 1 ? `the document. ` : `the documents. `;
@@ -366,10 +370,29 @@ const getBlogPost = async (results, length) => {
   for (let i = 0; i < results.length; ++i) {
     prompt += i < results.length - 1 ? `Document "${results[i].title}":\n${results[i].text}\n\n"` : `Document "${results[i].title}":\n${results[i].text}"""\n`;
   }
-  const newsArticle = await ai.getChatText(prompt);
+  try {
+    let blogPost = await ai.getChatText(prompt);
+    const link = s3.uploadHTML(blogPost, s3Folder, `creation--${uuidv4()}.html`);
+    return link;
+  } catch (err) {
+    console.error(err);
+    return false;
+  }
+}
 
-  console.log('newsArticle', newsArticle);
-  return newsArticle;
+const customInstructions = async (results, prompt, s3Folder) => {
+  prompt = `"""${prompt}\n\n`;
+  for (let i = 0; i < results.length; ++i) {
+    prompt += i < results.length - 1 ? `Document "${results[i].title}":\n${results[i].text}\n\n"` : `Document "${results[i].title}":\n${results[i].text}"""\n`;
+  }
+  try {
+    let creation = await ai.getChatText(prompt);
+    const link = s3.uploadHTML(creation, s3Folder, `creation--${uuidv4()}.html`);
+    return link;
+  } catch (err) {
+    console.error(err);
+    return false;
+  }
 }
 
 const convertTextToHTML = text => {
@@ -415,7 +438,10 @@ const handleMix = async ({login, bowls, mix, bowlId}, socket) => {
         
         break;
       case 'blogPost':
-        creation = await getBlogPost(results, outputLength);
+        creation = await getBlogPost(results, outputLength, s3Folder);
+        break;
+      case 'custom':
+        creation = await customInstructions(results, currentBowl.customInstructions, s3Folder);
         break;
       default:
         return socket.emit('alert', `Unknown output type: ${currentBowl.output}`)
