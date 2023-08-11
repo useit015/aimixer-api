@@ -329,7 +329,7 @@ const getNewsArticle = async (results, length) => {
   for (let i = 0; i < results.length; ++i) {
     prompt += i < results.length - 1 ? `Document "${results[i].title}":\n${results[i].text}\n\n"` : `Document "${results[i].title}":\n${results[i].text}"""\n`;
   }
-  const newsArticle = ai.getChatText(prompt);
+  const newsArticle = await ai.getChatText(prompt);
 
   console.log('newsArticle', newsArticle);
   return newsArticle;
