@@ -304,6 +304,21 @@ const handleChangeContentDate = async (data, socket) => {
   return socket.emit('changeContentDate', {bowlId, contentId, date});
 }
 
+const handleMix = async ({login, bowls, fill, mix}, socket) => {
+  try {
+    const { token } = login;
+    const info = auth.validateToken(token);
+    if (info === false) return socket.emit('alert', 'Login expired.');
+    const { accountId, email, username, domain } = info;
+    console.log('handleMix', info);
+    
+  } catch (err) {
+    socket.email('alert', "Could not mix contents");
+  }
+
+
+}
+
 
 
 io.on("connection", (socket) => {
@@ -323,7 +338,8 @@ io.on("connection", (socket) => {
   socket.on('changeBowlLength', data => handleChangeBowlLength(data, socket));
   socket.on('changeBowlSource', data => handleChangeBowlSource(data, socket));
   socket.on('addContentToBowl', data => handleAddContentToBowl(data, socket));
-  socket.on('changeContentDate', data => handleChangeContentDate(data, socket));
+  socket.on('changeContentDate', state => handleChangeContentDate(state, socket));
+  socket.on('mix', data => handleMix(data, socket));
 
   // socket.emit('message', 'Login Successful');
   // socket.emit('alert', 'Ooops');
