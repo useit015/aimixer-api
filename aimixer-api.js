@@ -407,6 +407,7 @@ const handleMix = async ({login, bowls, mix, bowlId}, socket) => {
     const info = auth.validateToken(token);
     if (info === false) return socket.emit('alert', 'Login expired.');
     const { accountId, email, username, domain } = info;
+
     console.log('handleMix', info);
     const s3Folder = `${accountId}/${bowlId}`
 
@@ -461,6 +462,34 @@ const handleMix = async ({login, bowls, mix, bowlId}, socket) => {
 
 }
 
+const handleDeleteContent = async ({token, bowlId, contentId}, socket) => {
+  try {
+    const { token } = login;
+    const info = auth.validateToken(token);
+    if (info === false) return socket.emit('alert', 'Login expired.');
+    
+    let q = `SELECT meta FROM bowls WHERE bowlId = ${mysql.escape(bowlId)}`;
+
+    let r = await query(q);
+
+    if (!r.length) return socket.emit('alert', 'Datbase error. Could not remove content.');
+
+    let meta = JSON.parse(meta);
+
+    meta.contents = meta.contents.filter(c => c.id !== contentId);
+
+    q = `UPDATE bowls SET meta = ${mysql.escape(JSON.stringify(meta))} WHERE bowlId = ${mysql.escape(bowlId)}`;
+
+    r = await query(q);
+
+    if (r === false) return socket.emit('alert', 'Datbase error 002. Could not remove content.');
+
+    socket.emit('deleteContent', {bowlId, contentId});
+
+  } catch (err) {
+    console.error(err)
+    return socket.emit('alert', 'Unable to delete content');
+  }
 
 
 io.on("connection", (socket) => {
@@ -481,6 +510,7 @@ io.on("connection", (socket) => {
   socket.on('changeBowlSource', data => handleChangeBowlSource(data, socket));
   socket.on('addContentToBowl', data => handleAddContentToBowl(data, socket));
   socket.on('changeContentDate', state => handleChangeContentDate(state, socket));
+  socket.on('deleteContent', data => handleDeleteContent(data, socket));
   socket.on('mix', data => handleMix(data, socket));
 
   // socket.emit('message', 'Login Successful');
