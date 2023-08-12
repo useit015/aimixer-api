@@ -464,21 +464,21 @@ const handleMix = async ({login, bowls, mix, bowlId}, socket) => {
 
 const handleDeleteContent = async ({token, bowlId, contentId}, socket) => {
   try {
-    const { token } = login;
+    
     const info = auth.validateToken(token);
     if (info === false) return socket.emit('alert', 'Login expired.');
     
-    let q = `SELECT meta FROM bowls WHERE bowlId = ${mysql.escape(bowlId)}`;
+    let q = `SELECT meta FROM bowls WHERE id = ${mysql.escape(bowlId)}`;
 
     let r = await query(q);
 
     if (!r.length) return socket.emit('alert', 'Datbase error. Could not remove content.');
 
-    let meta = JSON.parse(meta);
+    let meta = JSON.parse(r[0].meta);
 
     meta.contents = meta.contents.filter(c => c.id !== contentId);
 
-    q = `UPDATE bowls SET meta = ${mysql.escape(JSON.stringify(meta))} WHERE bowlId = ${mysql.escape(bowlId)}`;
+    q = `UPDATE bowls SET meta = ${mysql.escape(JSON.stringify(meta))} WHERE id = ${mysql.escape(bowlId)}`;
 
     r = await query(q);
 
@@ -490,7 +490,7 @@ const handleDeleteContent = async ({token, bowlId, contentId}, socket) => {
     console.error(err)
     return socket.emit('alert', 'Unable to delete content');
   }
-
+}
 
 io.on("connection", (socket) => {
   console.log('connected', socket.id)
