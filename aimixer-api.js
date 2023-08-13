@@ -13,6 +13,7 @@ const { v4: uuidv4 } = require('uuid');
 const mysql = require('mysql2');
 const axios = require('axios');
 
+const wp = require('./utils/wordpress');
 const s3 = require('./utils/s3')
 const ai = require('./utils/ai')
 const auth = require('./utils/auth');
@@ -492,6 +493,23 @@ const handleDeleteContent = async ({token, bowlId, contentId}, socket) => {
   }
 }
 
+const handleWordpresUpload = async (data, socket) => {
+  const { password, token, title, postType, content } = data;
+  const info = auth.validateToken(token);
+  if (info === false) return socket.emit('alert', 'Login expired.');
+  const { accountId, email, username, domain } = info;
+
+  try {
+    const result = wp.createPost('delta.pymnts.com', username, password, title, content, postType);
+    if (result === false) socket.emit('alert', "Could not upload to WordPress");
+    socket.emit('spinnerStatus', false);
+  } catch (err) {
+    console.error(err);
+    socket.emit('alert', "Could not upload to WordPress");
+    socket.emit('spinnerStatus', false);
+  }
+}
+
 io.on("connection", (socket) => {
   console.log('connected', socket.id)
  
@@ -511,6 +529,7 @@ io.on("connection", (socket) => {
   socket.on('addContentToBowl', data => handleAddContentToBowl(data, socket));
   socket.on('changeContentDate', state => handleChangeContentDate(state, socket));
   socket.on('deleteContent', data => handleDeleteContent(data, socket));
+  socket.on('wordpressUpload', data => handleWordpresUpload(data, socket));
   socket.on('mix', data => handleMix(data, socket));
 
   // socket.emit('message', 'Login Successful');
