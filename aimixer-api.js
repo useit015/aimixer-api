@@ -46,15 +46,31 @@ const query = q => {
   })
 }
 
+/*
+ * REST API Service
+ */
+
 
 const app = express();
 app.use(express.static('public'));
 app.use(express.json({limit: '200mb'})); 
 app.use(cors());
 
+const handleGetTagsTitles = async (req, res) => {
+  const { token, content } = req.body;
+  const info = auth.validateToken(token);
+  if (info === false) return res.status(401).json('unauthorized');
+  const { accountId, email, username, domain } = info;
+
+  const tt = await ai.getTagsAndTitles(content);
+
+  return res.status(200).json(tt);
+}
+
 app.get('/', (req, res) => {
     res.send('Hello, World!');
 });
+app.post('/getTagsTitles', (req, res) => handleGetTagsTitles(req, res))
 
 const httpsServer = https.createServer({
     key: fs.readFileSync(privateKeyPath),
@@ -65,6 +81,10 @@ const httpsServer = https.createServer({
 httpsServer.listen(listenPort, '0.0.0.0', () => {
     console.log(`HTTPS Server running on port ${listenPort}`);
 });
+
+/*
+ * Socket Service
+ */
 
 const io = socketio(httpsServer, {
   cors: {
@@ -397,11 +417,6 @@ const getNewsArticleFromTranscript = async (results, length, s3Folder, socket) =
   /*
    * Rewrite article
    */
-
-
-
-
-  return false;
 
 }
 
