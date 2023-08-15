@@ -1,5 +1,5 @@
 require('dotenv').config();
-const listenPort = 5000;
+const listenPort = process.argv.length === 2 ? 5000 : 5300;
 const hostname = 'app.aimixer.io'
 const privateKeyPath = `/etc/sslkeys/aimixer.io/aimixer.io.key`;
 const fullchainPath = `/etc/sslkeys/aimixer.io/aimixer.io.pem`;
@@ -12,6 +12,7 @@ const socketio = require('socket.io');
 const { v4: uuidv4 } = require('uuid');
 const mysql = require('mysql2');
 const axios = require('axios');
+const lodash = require('lodash');
 
 const wp = require('./utils/wordpress');
 const s3 = require('./utils/s3')
@@ -129,7 +130,9 @@ const handleGetBowls = async (token, socket) => {
       source: meta.source,
       contents: meta.contents,
       creations: meta.creations,
-      customInstructions: meta.customInstructions
+      customInstructions: meta.customInstructions,
+      input: meta.input ? lodash.cloneDeep(meta.input) : {},
+      misc: meta.misc ? lodash.cloneDeep(meta.misc) : {}
     }
   })
 
@@ -150,6 +153,15 @@ const handleAddBowl = async (data, socket) => {
     source: 'googleSearch',
     contents: [],
     creations: [],
+    input: {
+      mode: 'siteSearch',
+      term: '',
+      site: '',
+      timePeriod: 'last_month',
+      index: 'google_search_news',
+      results: []
+    },
+    misc: {}
   }
 
   let q = `INSERT INTO bowls (id, account_id, name, creator, domain, meta) VALUES ('${id}', '${accountId}', ${mysql.escape(name)}, '${email}', '${domain}', '${JSON.stringify(meta)}')`;
@@ -508,13 +520,24 @@ const handleMix = async ({login, bowls, mix, bowlId}, socket) => {
     // Convert desired length to English
     let outputLength;
     switch (currentBowl.length) {
+      case 'concise':
+        outputLength = "300 words";
+        break;
+
+      case 'shortForm':
+        outputLength = "600 words";
+        break;
+
       case 'longForm':
         outputLength = "1200 words";
         break;
 
+      case 'exhaustive':
+        outputLength = "4000 words";
+        break;
+
       default:
-        socket.emit('spinnerStatus', false);
-        return socket.emit('alert', `Unknown content length: ${currentBowl.length}`);
+        outputLength = "1200 words";
     }
 
     // Use AI to generate desired creation
@@ -583,13 +606,13 @@ const handleDeleteContent = async ({token, bowlId, contentId}, socket) => {
 }
 
 const handleWordpresUpload = async (data, socket) => {
-  const { password, token, title, postType, content } = data;
+  const { password, token, title, postType, content, AITags, AITitles } = data;
   const info = auth.validateToken(token);
   if (info === false) return socket.emit('alert', 'Login expired.');
   const { accountId, email, username, domain } = info;
 
   try {
-    const result = wp.createPost('delta.pymnts.com', username, password, title, content, postType);
+    const result = wp.createPost('delta.pymnts.com', username, password, title, content, postType, AITags, AITitles);
     if (result === false) socket.emit('alert', "Could not upload to WordPress");
     socket.emit('spinnerStatus', false);
   } catch (err) {
