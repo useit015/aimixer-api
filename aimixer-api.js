@@ -368,11 +368,11 @@ const getTitlesAndText = async (content) => {
   const { title } = content;
   try {
     const response = await axios.get(url);
-    return {title, text: response.data, type: content.type, subType: content.subType}
+    return {title, text: response.data, type: content.type, subType: content.subType, origURL: content.origURL ? content.origURL : ''}
   } catch(err) {
     console.error(err);
     return {
-      title, text: '', type: content.type, subType: content.subType
+      title, text: '', type: content.type, subType: content.subType, origURL: content.origURL ? content.origURL : ''
     }
   }
 }
@@ -443,6 +443,8 @@ const getNewsArticle = async (results, length, s3Folder, socket) => {
   }
   try {
     let newsArticle = await ai.getChatText(prompt);
+    newsArticle += "\n\nThird Party Links\n";
+    for (let i = 0; i < results.length; ++i) if (results[i].origURL) newsArticle += results[i].origURL + "\n";
     newsArticle = convertTextToHTML(newsArticle);
     const link = s3.uploadHTML(newsArticle, s3Folder, `creation--${uuidv4()}.html`);
     return link;
@@ -512,10 +514,14 @@ const handleMix = async ({login, bowls, mix, bowlId}, socket) => {
     }
     const { contents } = currentBowl;
 
+
+
     // Get titles and text
     let promises = [];
     for (let i = 0; i < contents.length; ++i) promises.push(getTitlesAndText(contents[i]));
     let results = await Promise.all(promises);
+
+    console.log('RESULTS', results);
 
     // Convert desired length to English
     let outputLength;
