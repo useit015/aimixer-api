@@ -368,7 +368,7 @@ const getTitlesAndText = async (content) => {
   const { title } = content;
   try {
     const response = await axios.get(url);
-    return {title, text: response.data, type: content.type, subType: content.subType, origURL: content.origURL ? content.origURL : ''}
+    return {title, text: response.data, type: content.type, subType: content.subType, origURL: content.origURL ? content.origURL : '' }
   } catch(err) {
     console.error(err);
     return {
@@ -443,7 +443,7 @@ const getNewsArticle = async (results, length, s3Folder, socket) => {
   }
   try {
     let newsArticle = await ai.getChatText(prompt);
-    newsArticle += "\n\nThird Party Links\n";
+    newsArticle += "\n\nThird Party Links\n\n";
     for (let i = 0; i < results.length; ++i) if (results[i].origURL) newsArticle += results[i].origURL + "\n";
     newsArticle = convertTextToHTML(newsArticle);
     const link = s3.uploadHTML(newsArticle, s3Folder, `creation--${uuidv4()}.html`);
@@ -618,9 +618,10 @@ const handleWordpresUpload = async (data, socket) => {
   const { accountId, email, username, domain } = info;
 
   try {
-    const result = wp.createPost('delta.pymnts.com', username, password, title, content, postType, AITags, AITitles);
+    const result = await wp.createPost('delta.pymnts.com', username, password, title, content, postType, AITags, AITitles);
     if (result === false) socket.emit('alert', "Could not upload to WordPress");
     socket.emit('spinnerStatus', false);
+    socket.emit('message', 'WordPress content has been uploaded.');
   } catch (err) {
     console.error(err);
     socket.emit('alert', "Could not upload to WordPress");
