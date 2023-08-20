@@ -417,6 +417,12 @@ const assignWordLength = length => {
   }
 }
 
+const displayContentFacts = contents => {
+  contents.forEach(content => {
+    console.log(JSON.stringify(content.facts, null, 4));
+  });
+}
+
 const handleMix = async ({login, mix, currentBowl}, socket) => {
   socket.emit('spinnerStatus', true);
   try {
@@ -429,6 +435,8 @@ const handleMix = async ({login, mix, currentBowl}, socket) => {
     const { accountId, email, username, domain } = info;
     const s3Folder = `${accountId}/${currentBowl.id}`
     const { contents } = currentBowl;
+
+    if (contents[0].facts) displayContentFacts(contents);
 
     // Get titles and text
     let promises = [];
@@ -445,7 +453,9 @@ const handleMix = async ({login, mix, currentBowl}, socket) => {
     let creation;
     switch(currentBowl.output) {
       case 'newsArticle':
-        creation = await mixIt.newsArticle(results, outputLength, s3Folder, socket);
+        //creation = await mixIt.newsArticle(results, outputLength, s3Folder, socket);
+        creation = await mixIt.newsArticleFromFacts(contents, outputLength, s3Folder, socket);
+        
         break;
       case 'blogPost':
         creation = await mixIt.blogPost(results, outputLength, s3Folder);

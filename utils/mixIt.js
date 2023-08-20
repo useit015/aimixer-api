@@ -6,6 +6,7 @@ const wp = require('./wordpress');
 const s3 = require('./s3')
 const ai = require('./ai')
 const auth = require('./auth');
+const showdown  = require('showdown');
 
 const convertTextToHTML = text => {
   const paragraphs = text.split("\n");
@@ -82,6 +83,40 @@ const getNewsArticleFromTranscript = async (results, length, s3Folder, socket) =
       let newsArticle = await ai.getChatText(prompt);
       newsArticle += "\n\nThird Party Links\n\n";
       for (let i = 0; i < results.length; ++i) if (results[i].origURL) newsArticle += results[i].origURL + "\n";
+      newsArticle = convertTextToHTML(newsArticle);
+      const link = s3.uploadHTML(newsArticle, s3Folder, `creation--${uuidv4()}.html`);
+      return link;
+    } catch (err) {
+      console.error(err);
+      return false;
+    }
+  }
+
+  exports.newsArticleFromFacts = async (contents, length, s3Folder, socket) => {
+    const facts = {facts: [], quotes: []}
+    contents.forEach(content => {
+      if (content.facts) {
+        for (i = 0; i < content.facts.length; ++i) {
+          let factE = content.facts[i];
+          factE.facts.forEach(fact => facts.facts.push(fact));
+          factE.quotes.forEach(quote => facts.quotes.push(quote));
+        }
+      }
+    })
+
+    let prompt = `"""Below are facts and quotes in stringified JSON. Write a 1200 word news article in journalistic tone. You must base the news article solely on the provided facts and quotes. The returned content must be markdown format. The returned content must include 5 quotes.
+
+Facts and Quotes:
+${JSON.stringify(facts)}"""\n`;
+
+    console.log(prompt);
+
+    try {
+      let newsArticleMd = await ai.getChatText(prompt);
+      const converter = new showdown.Converter();
+      let newsArticle = converter.makeHtml(newsArticleMd);
+      newsArticle += "\n\nThird Party Links\n\n";
+      for (let i = 0; i < contents.length; ++i) if (contents[i].origURL) newsArticle += contents[i].origURL + "\n";
       newsArticle = convertTextToHTML(newsArticle);
       const link = s3.uploadHTML(newsArticle, s3Folder, `creation--${uuidv4()}.html`);
       return link;

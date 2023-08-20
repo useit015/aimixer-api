@@ -21,6 +21,7 @@
     "lodash": "^4.17.21",
     "mysql2": "^3.6.0",
     "openai": "^3.3.0",
+    "showdown": "^2.1.0",
     "socket.io": "^4.7.2",
     "uuid": "^9.0.0",
     "wink-eng-lite-web-model": "^1.5.2",
