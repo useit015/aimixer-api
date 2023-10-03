@@ -26,8 +26,8 @@ module.exports = {
   listenPort: !isDev ? 5000 : 5300,
   privateKeyPath: isDev
     ? './ssl/localhost-key.pem'
-    : `/etc/sslkeys/aimixer.io/aimixer.io.key`,
+    : '/etc/sslkeys/aimixer.io/aimixer.io.key',
   fullchainPath: isDev
     ? './ssl/localhost.pem'
-    : `/etc/sslkeys/aimixer.io/aimixer.io.pem`
+    : '/etc/sslkeys/aimixer.io/aimixer.io.pem'
 };

@@ -4,7 +4,8 @@
   "description": "",
   "main": "aimixer-api.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "NODE_ENV=dev nodemon data-visualization-server.js",
+    "start": "node data-visualization-server.js"
   },
   "author": "Michael Wood",
   "license": "SEE LICENSE IN license.md",
@@ -26,5 +27,8 @@
     "uuid": "^9.0.0",
     "wink-eng-lite-web-model": "^1.5.2",
     "wink-nlp": "^1.14.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
   }
 }
