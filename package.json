@@ -4,8 +4,8 @@
   "description": "",
   "main": "aimixer-api.js",
   "scripts": {
-    "dev": "NODE_ENV=dev nodemon data-visualization-server.js",
-    "start": "node data-visualization-server.js"
+    "dev": "cross-env NODE_ENV=dev nodemon aimixer-api.js",
+    "start": "node aimixer-api.js"
   },
   "author": "Michael Wood",
   "license": "SEE LICENSE IN license.md",
@@ -29,6 +29,7 @@
     "wink-nlp": "^1.14.3"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "nodemon": "^3.0.1"
   }
 }
