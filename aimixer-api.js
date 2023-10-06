@@ -584,6 +584,49 @@ const handleWordpresUpload = async (data, socket) => {
   }
 };
 
+const handleAssistant = async (
+  { userPrompt, bowlId, article, login },
+  socket
+) => {
+  const exit = alert => {
+    socket.emit('spinnerStatus', false);
+
+    socket.emit('closeAiAssistant', !alert);
+
+    if (alert) {
+      socket.emit('alert', alert);
+    }
+  };
+
+  socket.emit('spinnerStatus', true);
+
+  try {
+    const info = auth.validateToken(login.token);
+
+    if (!info) {
+      return exit('Login expired.');
+    }
+
+    const s3Folder = `${info.accountId}/${bowlId}`;
+
+    const document = await getTitlesAndText(article);
+
+    const prompt = `${userPrompt} using the Document below`;
+
+    const creation = await customInstructions([document], prompt, s3Folder);
+
+    if (!creation) {
+      return exit('Could not mix contents into the desired creation');
+    }
+
+    await addCreation(creation, bowlId, socket);
+
+    exit();
+  } catch (error) {
+    exit(error.message);
+  }
+};
+
 io.on('connection', socket => {
   console.log('connected', socket.id);
 
@@ -606,6 +649,7 @@ io.on('connection', socket => {
   socket.on('deleteContent', data => handleDeleteContent(data, socket));
   socket.on('wordpressUpload', data => handleWordpresUpload(data, socket));
   socket.on('mix', data => handleMix(data, socket));
+  socket.on('aiAssistant', data => handleAssistant(data, socket));
 
   // socket.emit('message', 'Login Successful');
   // socket.emit('alert', 'Ooops');
