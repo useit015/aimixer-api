@@ -611,7 +611,7 @@ const handleAssistant = async (
 
     const document = await getTitlesAndText(article);
 
-    const prompt = `${userPrompt} using the Document below`;
+    const prompt = `Using the Document below, ${userPrompt}`;
 
     const creation = await customInstructions([document], prompt, s3Folder);
 
